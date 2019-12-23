@@ -74,12 +74,13 @@ class LinearChain(_Struct):
         big[:, :, : N - 1] = log_potentials
         c = chart[:, :, :].view(ssize, batch * bin_N, C, C)
         lp = big[:, :, :].view(ssize, batch * bin_N, C, C)
-        mask = torch.arange(
-            bin_N,
-            device = log_potentials.device,
-        ).view(1, bin_N).expand(batch, bin_N)
+        mask = (
+            torch.arange(bin_N, device=log_potentials.device,)
+            .view(1, bin_N)
+            .expand(batch, bin_N)
+        )
         mask = mask >= (lengths - 1).view(batch, 1)
-        mask = mask.view(batch * bin_N, 1, 1)#.to(lp.device)
+        mask = mask.view(batch * bin_N, 1, 1)
         semiring.zero_mask_(lp.data, mask)
         semiring.zero_mask_(c.data, (~mask))
 
@@ -184,15 +185,15 @@ class LinearChain(_Struct):
         batch, N = observations.shape
 
         scores = semiring.one_(
-            torch
-                .empty(batch, N - 1, C, C, device=emission.device)
-                .type_as(emission)
+            torch.empty(batch, N - 1, C, C, device=emission.device).type_as(emission)
         )
         scores[:, :, :, :] = semiring.times(scores, transition.view(1, 1, C, C))
         scores[:, 0, :, :] = semiring.times(scores[:, 0, :, :], init.view(1, 1, C))
         obs = emission[observations.view(batch * N), :]
         scores[:, :, :, :] = semiring.times(scores, obs.view(batch, N, C, 1)[:, 1:])
-        scores[:, 0, :, :] = semiring.times(scores[:, 0], obs.view(batch, N, 1, C)[:, 0])
+        scores[:, 0, :, :] = semiring.times(
+            scores[:, 0], obs.view(batch, N, 1, C)[:, 0]
+        )
 
         return scores
 
