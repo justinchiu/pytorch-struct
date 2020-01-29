@@ -198,6 +198,38 @@ class LinearChain(_Struct):
         return scores
 
     @staticmethod
+    def arhmm(transition, emission, init, observations, semiring=semirings.LogSemiring):
+        """
+        Convert HMM to a linear chain.
+
+        Parameters:
+            transition: C X C
+            emission: b x N x V x C
+            init: C
+            observations: b x N between [0, V-1]
+
+        Returns:
+            edges: b x (N-1) x C x C
+        """
+        batch, N, V, C = emission.shape
+        batch, N = observations.shape
+
+        scores = semiring.one_(
+            torch.empty(batch, N - 1, C, C, device=emission.device).type_as(emission)
+        )
+        scores[:, :, :, :] = semiring.times(scores, transition.view(1, 1, C, C))
+        scores[:, 0, :, :] = semiring.times(scores[:, 0, :, :], init.view(1, 1, C))
+        obs = emission.gather(-2,
+            observations.view(batch, N, 1, 1).expand(batch, N, 1, C),
+        )
+        scores[:, :, :, :] = semiring.times(scores, obs.view(batch, N, C, 1)[:, 1:])
+        scores[:, 0, :, :] = semiring.times(
+            scores[:, 0], obs.view(batch, N, 1, C)[:, 0]
+        )
+
+        return scores
+
+    @staticmethod
     def _rand(min_n=2):
         b = torch.randint(2, 4, (1,))
         N = torch.randint(min_n, 4, (1,))
